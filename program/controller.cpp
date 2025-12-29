@@ -119,12 +119,12 @@ int main() {
 				strcat_s(send_buf, " ");
 			}
 			else {
-				strcpy_s(send_buf, " ");
+				strcpy_s(send_buf, " "); //配列をコピー
 			}
 
 			for (int i = 0; i < 8; i++) {
 				if (JoyInfoEx.dwButtons & (1 << i)) {
-					strcat_s(send_buf, character[i]);
+					strcat_s(send_buf, character[i]); //2つの配列を連結
 					strcat_s(send_buf, " ");
 				}
 			}
@@ -138,6 +138,7 @@ int main() {
 		}
 	}
 }
+
 
 
 
