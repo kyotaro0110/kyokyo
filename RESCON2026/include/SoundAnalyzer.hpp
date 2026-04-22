@@ -32,7 +32,8 @@ public:
 		SoundReceiver::update();
 		for (int i = 0; i < AudioConfig::SAMPLE_COUNT; ++i)
 		{
-			double window = 0.54 - 0.46 * std::cos(2.0 * Math::Pi * i / (AudioConfig::SAMPLE_COUNT - 1));
+			double window = 0.42 - 0.5 * std::cos(2.0 * Math::Pi * i / (AudioConfig::SAMPLE_COUNT - 1))
+				+ 0.08 * std::cos(4.0 * Math::Pi * i / (AudioConfig::SAMPLE_COUNT - 1));
 			m_fftReal[i] = static_cast<double>(m_buffer[i]) / 32767.0 * window; 
 			m_fftImag[i] = 0.0; //音声信号に虚部はないので0固定
 		}

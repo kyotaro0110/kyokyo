@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 namespace AudioConfig {
-	static constexpr int32 SAMPLE_COUNT = 16384;
+	static constexpr int32 SAMPLE_COUNT = 8192;
 
 	static constexpr double m_samplingRate = 48000.0;
 
@@ -12,4 +12,7 @@ namespace AudioConfig {
 		0,207.7,220.0,233.1,246.9,261.6,277.2,293.7, 311.1, 329.6, 349.2, 369.2, 392.0, 415.3, 440.0, 466.2, 493.9, 523.3, 554.4, 587.3, 622.3, 659.3, 698.5, 740.0, 784.0, 830.6, 880.0, 932.3, 987.8, 1046.5, 1108.7, 1174.7, 1244.5, 1318.5, 1396.9, 1480.0, 1568.0, 1661.2, 1760.0, 1864.7, 1975.5, 2093.0, 2217.5, 2349.3, 2489.0, 2637.0, 2793.8, 2960.0
 	};
 	double m_spectrumScale = 0.5;
+
+	
+
 }

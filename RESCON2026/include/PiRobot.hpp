@@ -81,8 +81,10 @@ public:
 		if (idx >= amplitudes.size()) return false;
 		double threshold = 3.0;
 
-		if(targetHz < 1000.0) threshold = 3.0;
-		else if(targetHz < 2000.0) threshold = 2.0;
+		if (targetHz < 100.0) threshold = 30.0;
+		else if (targetHz < 500.0) threshold = 30.0;
+		else if(targetHz < 1000.0) threshold = 6.0;
+		else if(targetHz < 2000.0) threshold = 3.0;
 		else threshold = 1.0;
 		return (amplitudes[idx] > threshold);
 	}
@@ -142,14 +144,18 @@ public:
 				// 配列の外を参照しないようガード
 				idx = Min(idx, amplitudes.size() - 1);
 
-				double rawVal = amplitudes[idx];
+				double rawVal = 0.0;
+
+				for (int32 offset = -1; offset <= 1; ++offset) {
+					size_t checkIdx = static_cast<size_t>(Max<int32>(0, static_cast<int32>(idx) + offset));
+					checkIdx = Min(checkIdx, amplitudes.size() - 1);
+					rawVal = Max(rawVal, amplitudes[checkIdx]);
+				}
 				double threshold = 3.0;
-				if (hz < 1000.0) threshold = 3.0;
-				else if (hz < 2000.0) threshold = 2.0;
-				else threshold = 1.0;
+				
 				if (rawVal < threshold) rawVal = 0.0;
 
-				double h = Min(rawVal * m_spectrumScale * 200.0, region.h); //region.hは
+				double h = Min(rawVal * m_spectrumScale * 25.0, region.h); //region.hは
 
 				// 横軸の座標計算 (0〜maxHz を region.w にマッピング)
 				double xPos = region.x + (hz / maxHz) * region.w;
@@ -192,9 +198,16 @@ public:
 
 				const String label = U"{:.1f} Hz"_fmt(preciseHz);
 				// 文字の表示領域を計算し、少し広げて白背景にする
-				const auto regionText = m_font(label).regionAt(18, Cursor::Pos().x, region.y - 20);
-				regionText.stretched(4, 2).draw(Palette::White);
-				m_font(label).drawAt(18, preciseX, region.y - 20, Palette::Black);
+				//const auto regionText = m_font(label).regionAt(18, Cursor::Pos().x, region.y - 20);
+				//regionText.stretched(4, 2).draw(Palette::White);
+				double rawVal = 0.0;
+
+				for (int32 offset = -1; offset <= 1; ++offset) {
+					size_t checkIdx = static_cast<size_t>(Max<int32>(0, static_cast<int32>(idx) + offset));
+					checkIdx = Min(checkIdx, amplitudes.size() - 1);
+					rawVal = Max(rawVal, amplitudes[checkIdx]);
+				}
+				m_font(label,rawVal).drawAt(18, preciseX, region.y+region.h/2, Palette::Black);
 			}
 			
 		}
