@@ -146,12 +146,15 @@ public:
 			return;
 		}
 
+		//Print << ServoCondition().x;
+
 		memset(send_buf, 0, sizeof(send_buf));
 		send_buf[0] = button;
 		send_buf[1] = direction;
 		send_buf[2] = static_cast<char>(magnitude);
 		send_buf[3] = static_cast<char>(ServoCondition().x/2);
 		send_buf[4] = static_cast<char>(ServoCondition().y/2);
+		
 		int ret = sendto(send_socket, send_buf, 5, 0,
 			(struct sockaddr*)&send_addr, sizeof(send_addr));
 

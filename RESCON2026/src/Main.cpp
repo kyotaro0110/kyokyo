@@ -6,6 +6,7 @@
 # include "menu.hpp"
 # include "PiRobot.hpp"
 # include "SoundAnalyzer.hpp"
+# include "Pulldown.hpp"
 
 enum class AppState {
 	Home,
@@ -48,6 +49,7 @@ void Main()
 	const double cm = 37.8;
 	//const double mm = 3.78;
 	bool isFull = false;
+	static size_t modeIndex = 0;
 	Window::Resize(1280, 720);
 	
 	const Font font{ FontMethod::MSDF, 48, Typeface::Bold };
@@ -55,17 +57,23 @@ void Main()
 	const Rect buttonArea = RectF{ Arg::center(400, 400), 200, 60 }.asRect();
 	const RectF leftArea{ 300,130, 80, 30 };
 	const RectF rightArea{ leftArea.rightX() + leftArea.w + 20 ,leftArea.topY(), leftArea.w, leftArea.h};
-	const RectF Frame{ leftArea.leftX() ,6 * cm,24 * cm,5 * cm};
+	const RectF Frame{ leftArea.leftX() ,9 * cm,24 * cm,2 * cm};
 	const RectF SidebarArea{ 0, 0, 120, 1000 };
 	const RectF MenuHome{ 0, 100, 120, 60 };
 	const RectF MenuController{ 0, 160, 120, 60 };
 	const RectF MenuSettings{ 0, 220, 120, 60 };
-	const RectF CameraCapture{ 350,25,725,725 };
-	const RectF SubCameraCapture{ 1080,25,450,450 };
+	const RectF CameraCapture{ 350,75,700,700 };
+	const RectF SubCameraCapture{ 1080,75,420,420 };
+	const RectF QR{ 1120, 550, 300, 300 };
+	const RectF SoundPattern{ 1120, 550, 400, 100 };
+	Pulldown freqSelector(&AudioConfig::frequencyNames, Font{ 20 }, 20, Vec2{ 1300, SoundPattern.topY() - 50});
+	
 	
 	//size_t index = 0;
 	size_t MaxSpeed = 40;
 	int ActiveRobot = -1 , PrevRobot = -1;
+	const size_t maxHistory = 120; // 0.1秒ごとの更新なら12秒分
+	double m_spectrumScale = 0.5; //mutableはconstの状況でも変更を許可する
 
 	//操作ロボット選択ボタンの位置設定
 	Array<RectF> selectButtons;
@@ -77,6 +85,7 @@ void Main()
 	const RectF AppMain{ 10,150,240,80 };
 	const RectF AppControllerDrawer{ 10, AppMain.bottomY()+20,240,80};
 	const auto& deviceList = DeviceConfig_RRC23::g_devices_RRC23;
+	const auto& deviceList_eth0 = DeviceConfig_RRC23::g_devices_eth;
 
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -89,34 +98,9 @@ void Main()
 	//デバイス各々にポインターを配列により作成
 	Array<std::unique_ptr<IRobot>> robots;
 
-	for (const auto& info : deviceList)
-	{
-		try
-		{
-			std::unique_ptr<IRobot> robot;
-			if (info.type == DeviceType::RaspberryPi) {
-				robot = std::make_unique<PiRobot>(info);
-			}
-
-			// ここで接続を試みる
-			if (robot && robot->initialize()) {
-				robots.push_back(std::move(robot));
-			}
-			else {
-				// 接続に失敗したことを画面に出す（後述のPrintなどで）
-				System::MessageBoxOK(U"接続エラー: {}"_fmt(info.name));
-			}
-		}
-		catch (const std::exception& e)
-		{
-			// 予期せぬエラー（ソケット作成失敗など）が起きても、
-			// アプリを落とさずにコンソールへエラーを表示
-			Console << U"Critical Error ({}): "_fmt(info.name) << Unicode::FromUTF8(e.what());
-		}
-	}
-
 	//有線無線の選択インデックス
-	int32 selectIndex = 0;
+	int32 LANindex = 0; //0なら無線、１なら有線
+	int32 prevLANindex = 1;
 
 	//動かすロボットと動かさないロボットをBool変数で管理
 	Array<bool> robotSelection = { false, false, false, false };
@@ -161,6 +145,45 @@ void Main()
 		iconFont(char32(0xf0c9)).drawAt(30, 30, 40, Palette::White);
 		//HomeとControllerの画面切り替えにより、色が変わる(HomeとControllerの文字の色)
 
+		if (prevLANindex != LANindex)
+		{
+			robots.clear();
+			robotSelection.fill(false);
+			ActiveRobot = -1;
+			PrevRobot = -1;
+
+			const auto& currentDeviceList = (LANindex == 0) ? deviceList : deviceList_eth0;
+			for (const auto& info : currentDeviceList)
+			{
+				try
+				{
+					std::unique_ptr<IRobot> robot;
+					if (info.type == DeviceType::RaspberryPi) {
+						robot = std::make_unique<PiRobot>(info);
+					}
+
+					// ここで接続を試みる
+					if (robot && robot->initialize()) {
+						robots.push_back(std::move(robot));
+					}
+					else {
+						// 接続に失敗したことを画面に出す（後述のPrintなどで）
+						System::MessageBoxOK(U"接続エラー: {}"_fmt(info.name));
+						robots.push_back(nullptr);
+					}
+				}
+				catch (const std::exception& e)
+				{
+					// 予期せぬエラー（ソケット作成失敗など）が起きても、
+					// アプリを落とさずにコンソールへエラーを表示
+					Console << U"Critical Error ({}): "_fmt(info.name) << Unicode::FromUTF8(e.what());
+					robots.push_back(nullptr);
+				}
+			}
+		}
+
+		prevLANindex = LANindex;
+
 		if (SidebarArea.mouseOver()) {
 			SidebarArea.draw(ColorF{ 0.2, 0.2, 0.2 }); // 暗めのグレーで高級感を出す
 			iconFont(char32(0xf0c9)).drawAt(30, 30, 40, Palette::White);
@@ -195,9 +218,9 @@ void Main()
 		//ショートカットキーの作成（使うかわからん、ただの遊び心）
 		if (KeyShift.pressed() && KeyJ.down() || leftArea.mouseOver())
 		{
-			if (KeyShift.pressed() && KeyJ.down())selectIndex = 0;     // クリックで「無線」選択
+			if (KeyShift.pressed() && KeyJ.down())LANindex = 0;     // クリックで「無線」選択
 			else
-				if (MouseL.down()) selectIndex = 0;
+				if (MouseL.down()) LANindex = 0;
 
 		}
 
@@ -210,20 +233,16 @@ void Main()
 		if (KeyShift.pressed() && KeyL.down() || rightArea.mouseOver())
 		{
 			if (KeyShift.pressed() && KeyL.down())
-				selectIndex = 1;     // クリックで「有線」選択
+				LANindex = 1;     // クリックで「有線」選択
 			else
-				if (MouseL.down()) selectIndex = 1;
+				if (MouseL.down()) LANindex = 1;
 		}
 
 		//選択したロボットのみ、操作可能状態にする
 
 		for (int i = 0; i < 4; ++i) {
-			if (robotSelection[i])
+			if (robotSelection[i] && i < robots.size() && robots[i] != nullptr && ActiveRobot == i)
 				robots[i]->update(MaxSpeed);
-		}
-
-		for (int i = 0; i < 4; ++i) {
-			//if (robotSelection[i])
 		}
 
 		//枠内クリックで画面切り替え
@@ -235,8 +254,8 @@ void Main()
 			const Vec2 center = Scene::Center();
 
 			//有線無線の選択ボタンの追加
-			font(U"無線").drawAt(30, leftArea.center(), (selectIndex == 0) ? ActiveColor : InactiveColor);
-			font(U"有線").drawAt(30, rightArea.center(), (selectIndex == 1) ? ActiveColor : InactiveColor);
+			font(U"無線").drawAt(30, leftArea.center(), (LANindex == 0) ? ActiveColor : InactiveColor);
+			font(U"有線").drawAt(30, rightArea.center(), (LANindex == 1) ? ActiveColor : InactiveColor);
 
 			//1～4号機の選択ボタンの追加
 			for (auto [i, button] : Indexed(selectButtons))
@@ -244,6 +263,7 @@ void Main()
 				if (button.leftClicked())
 				{
 					// 接続状態を反転
+					if(std::count(robotSelection.begin(), robotSelection.end(), true) < 2)
 					robotSelection[i] = !robotSelection[i];
 
 					if (robotSelection[i]) {
@@ -271,6 +291,16 @@ void Main()
 
 				font(U"{}号機"_fmt(i + 1)).drawAt(25, button.center(), btnColor);
 			}
+			font(U"全ての接続をリセット").drawAt(25, Frame.center(), Palette::Gray);
+			if (Frame.leftClicked()) {
+				robots.clear();
+				robotSelection.fill(false);
+				ActiveRobot = -1;
+				PrevRobot = -1;
+				prevLANindex = -1;
+				ClearPrint();
+				System::MessageBoxOK(U"全ての接続をリセットしました。");
+			}
 		}
 
 		else if (AppState == AppState::InputViewer)
@@ -280,24 +310,32 @@ void Main()
 			controllermodeldrawer.setPos(Vec2{ 200, Scene::Height() - 200 });
 			controllermodeldrawer.draw();
 			buttonsdrawer.drawInput(MaxSpeed);
-			//CameraCapture.drawFrame(2, Palette::Black);
+			CameraCapture.drawFrame(2, Palette::Black);
 			SubCameraCapture.drawFrame(2, Palette::Black);
+			if (modeIndex == 0) {
+				QR.drawFrame(2, Palette::Black);
+			}
+			else {
+				SoundPattern.drawFrame(2, Palette::Black);
+			}
+			font(U"{}号機操作中"_fmt(ActiveRobot+1)).draw(25, 620, 25, Palette::Red);
+			font(U"{}号機待機中"_fmt(PrevRobot+1)).draw(25, 1250, 25, Palette::Orange);
+			//font(U"解析").draw(15, 1250, SoundPatternAnarayze.topY() - 50, Palette::Black);
+			SimpleGUI::HorizontalRadioButtons(modeIndex, { U"QR", U"聴音" }, Vec2{ 1120,SoundPattern.topY() - 50});
+			
 			
 			//2号機を操作中のみサブコントローラーの入力状況の描画
-			if (robotSelection[1] == true) {
+			if (robotSelection[1]) {
 				controllermodeldrawer1.setPos(Vec2{ 200, Scene::Height() - 500 });
 				controllermodeldrawer1.draw();
 			}
 
 			//オーディオの処理（仮）
 
-			for (int i = 0; i < 4; ++i) {
-				if (robotSelection[i]) {
-					robots[i]->analyzerUI(CameraCapture);
-					robots[i]->draw(Vec2{ 50,600 });
-					//robots[i]->draw(Vec2{50,50});
-				}
-			}
+			freqSelector.update();
+			//Scene::SetBackground(Palette::White);
+			size_t freq_index = freqSelector.getIndex();
+			//size_t selectedFreq = 
 
 			//今操作しているロボット固有の情報の描画
 			/*if (activeRobotIndex < robots.size()) {
@@ -308,7 +346,18 @@ void Main()
 			
 			for (int i = 0; i < 4; ++i)
 			{
-				auto& info = deviceList[i];
+				if (robotSelection[i] && i < robots.size() && robots[i] != nullptr && i == ActiveRobot) {
+					robots[i]->analyzerUI(CameraCapture, ActiveRobot, i);
+				}
+				if (robotSelection[i] && i < robots.size() && robots[i] != nullptr && i == ActiveRobot && modeIndex == 1) {
+					robots[i]->drawSignalHistory(SoundPattern, ActiveRobot, i, freq_index);
+				}
+				if(modeIndex == 1)
+					freqSelector.draw();
+				const auto& currentList = (LANindex == 0) ? DeviceConfig_RRC23::g_devices_RRC23
+					: DeviceConfig_RRC23::g_devices_eth;
+
+				const auto& info = currentList[i];
 				double x = 200;
 				double y = 20 + i * 30;
 				font(U"{}号機:IPアドレス{}"_fmt(i + 1, info.toipAddress)).drawAt(15, { x,y }, (robotSelection[i] == true) ? ((ActiveRobot == i) ? OperatedColor : ActiveColor) : InactiveColor);

@@ -15,6 +15,7 @@
 #pragma comment(lib,"wsock32.lib")
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"winmm.lib")
+#pragma comment(lib,"portaudio.lib")
 
 
 

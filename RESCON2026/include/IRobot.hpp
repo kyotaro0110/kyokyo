@@ -11,5 +11,6 @@ public:
 	virtual void update(size_t MaxSpeed) = 0;
 	virtual bool isConnected() = 0;
 	virtual void draw(const Vec2& pos) const {}
-	virtual void analyzerUI(const RectF& region) const{}
+	virtual void analyzerUI(const RectF& region, int ActiveRobot, int index) const {}
+	virtual void drawSignalHistory(const RectF& region, int ActiveRobot, int index,size_t freq_index) const {}
 };

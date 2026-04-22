@@ -81,7 +81,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DelayLoadDLLs>advapi32.dll;crypt32.dll;dwmapi.dll;gdi32.dll;imm32.dll;ole32.dll;oleaut32.dll;opengl32.dll;shell32.dll;shlwapi.dll;user32.dll;winmm.dll;ws2_32.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
-      <AdditionalLibraryDirectories>C:\opencv\build\x64\vc16\lib;C:/tools/vcpkg/installed/x64-windows/lib/portaudio.lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\opencv\build\x64\vc16\lib;C:/tools/vcpkg/installed/x64-windows/lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /I /D /Y "$(OutDir)$(TargetFileName)" "$(ProjectDir)App"</Command>
@@ -112,7 +112,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DelayLoadDLLs>advapi32.dll;crypt32.dll;dwmapi.dll;gdi32.dll;imm32.dll;ole32.dll;oleaut32.dll;opengl32.dll;shell32.dll;shlwapi.dll;user32.dll;winmm.dll;ws2_32.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
-      <AdditionalLibraryDirectories>C:\opencv\build\x64\vc16\lib;C:/tools/vcpkg/installed/x64-windows/lib/portaudio.lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\opencv\build\x64\vc16\lib;C:/tools/vcpkg/installed/x64-windows/lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /I /D /Y "$(OutDir)$(TargetFileName)" "$(ProjectDir)App"</Command>
@@ -411,6 +411,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\AudioConfig.hpp" />
     <ClInclude Include="include\ButtonsDrawer.hpp" />
     <ClInclude Include="include\Controller.hpp" />
     <ClInclude Include="include\ControllerModelDrawer.hpp" />
@@ -420,6 +421,7 @@
     <ClInclude Include="include\IRobot.hpp" />
     <ClInclude Include="include\menu.hpp" />
     <ClInclude Include="include\PiRobot.hpp" />
+    <ClInclude Include="include\Pulldown.hpp" />
     <ClInclude Include="include\SoundAnalyzer.hpp" />
     <ClInclude Include="include\SoundReceiver.hpp" />
     <ClInclude Include="include\SSHMonitoring.hpp" />

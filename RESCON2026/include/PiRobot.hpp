@@ -5,7 +5,14 @@
 #include "SoundReceiver.hpp"
 #include "SoundAnalyzer.hpp"
 #include "AudioConfig.hpp"
+#include "Siv3D.hpp"
+//ラズパイで動くロボットのクラス。コントローラーの状態をUDPで送る機能と、マイクから音を拾う機能を持つ。
+//マイクからの音のUIの描画もこのクラス内の関数で行う。
 
+struct SignalPoint {
+	double time;
+	int32 state;
+};
 
 class PiRobot : public IRobot {
 private:
@@ -14,6 +21,16 @@ private:
 	std::unique_ptr<Controller> m_controller;
 	std::unique_ptr<FftAnalyzer> m_fft;
 	std::unique_ptr<SoundReceiver> m_audioreceiver;
+	// 設定：0Hzから2000Hzまで、200Hz刻み
+	const double minHz = 100.0;
+	const double maxHz = 3000.0;
+	//const double stepHz = 0.1;
+	const double stepHz = 0.5;
+	static Array<Array<double>> history;
+	mutable Array<SignalPoint> m_signalHistory;
+	const size_t maxHistory = 400; // 0.1秒ごとの更新なら12秒分
+	const double m_displaySeconds = 5.0;
+	mutable double m_spectrumScale = 0.5; //mutableはconstの状況でも変更を許可する
 	Font m_font{ 24, Typeface::Black };
 public:
 	PiRobot(const DeviceInfo& info)
@@ -56,63 +73,130 @@ public:
 		//return true;
 	}
 
+	bool isFrequencyActive(double targetHz) const
+	{
+		size_t idx = static_cast<size_t>(targetHz * AudioConfig::SAMPLE_COUNT / AudioConfig::m_samplingRate);
+		const auto& amplitudes = m_fft->getAmplitudes();
 
-	void draw(const Vec2& pos = { 20, 20}) const override {
-		if (m_fft) {
-			const float vol = m_fft->getVolume();
-			//const float vol = m_audioreceiver->getVolume();
+		if (idx >= amplitudes.size()) return false;
+		double threshold = 3.0;
 
-			m_font(U"Mic Level {}"_fmt(vol)).draw(pos, Palette::Black);
-			//m_audioreceiver->drawgraph(RectF{ pos.x, pos.y + 40, 300, 100 });
+		if(targetHz < 1000.0) threshold = 3.0;
+		else if(targetHz < 2000.0) threshold = 2.0;
+		else threshold = 1.0;
+		return (amplitudes[idx] > threshold);
+	}
+
+	void drawSignalHistory(const RectF& region, int ActiveRobot, int index,size_t freq_index) const
+	{
+		if (ActiveRobot == index) {
+			if (!m_fft) return;
+
+			double targetHz = AudioConfig::frequencyValues[freq_index];
+
+			int32 currentSignal = isFrequencyActive(targetHz) ? 1 : 0;
+			double currentTime = Scene::Time();
+			m_signalHistory << SignalPoint{ currentTime, currentSignal };
+			m_signalHistory.remove_if([&](const SignalPoint& p) {
+				return p.time < (currentTime - m_displaySeconds);
+			});
+
+			for (const auto& p : m_signalHistory)
+			{
+				//右端が現時刻(0s),左へ行くほど過去
+				//秒数を座標に変換
+				double x = region.x + region.w - (currentTime - p.time) * (region.w / m_displaySeconds);
+
+				if (x < region.x) continue;
+
+				if (p.state == 1)
+				{
+					RectF{ x, region.y, 2, region.h }.draw(Palette::Orange);
+				}
+			}
+
+			for (int i = 0; i <= (int)m_displaySeconds; ++i) {
+				double x = region.x + region.w - i * (region.w / m_displaySeconds);
+				Line{ x, region.y + region.h, x, region.y + region.h + 5 }.draw(1, Palette::Gray);
+				m_font(U"-{}s"_fmt(i)).drawAt(12, x, region.y + region.h + 15, Palette::Black);
+			}
 		}
 	}
 
-	void analyzerUI(const RectF& region) const override
+	void analyzerUI(const RectF& region, int ActiveRobot, int index) const override
 	{
-		if (!m_fft) return;
+		SimpleGUI::VerticalSlider(m_spectrumScale, Vec2{ region.x + region.w + 20, region.y + region.h - 200 }, 200);
+		if (ActiveRobot == index) {
+			if (!m_fft) return;
 
-		region.drawFrame(2, Palette::Black);
+			const auto& amplitudes = m_fft->getAmplitudes();
+			if (amplitudes.empty()) return;
 
-		const auto& amplitudes = m_fft->getAmplitudes();
-		if (amplitudes.empty()) return;
+			LineString points;
 
-		// 設定：0Hzから2000Hzまで、200Hz刻み
-		const double maxHz = 2000.0;
-		const double stepHz = 200.0;
+			// 0, 200, 400, ..., 2000Hz の各地点の振幅を取得して点を作る
+			for (double hz = minHz; hz <= maxHz; hz += stepHz) {
+				// Hzからamplitudesのインデックスを計算
+				size_t idx = static_cast<size_t>(hz * (amplitudes.size() * 2) / AudioConfig::m_samplingRate);
 
-		LineString points;
+				// 配列の外を参照しないようガード
+				idx = Min(idx, amplitudes.size() - 1);
 
-		// 0, 200, 400, ..., 2000Hz の各地点の振幅を取得して点を作る
-		for (double hz = 0; hz <= maxHz; hz += stepHz) {
-			// Hzからamplitudesのインデックスを計算
-			size_t idx = static_cast<size_t>(hz * (amplitudes.size() * 2) / AudioConfig::m_samplingRate);
+				double rawVal = amplitudes[idx];
+				double threshold = 3.0;
+				if (hz < 1000.0) threshold = 3.0;
+				else if (hz < 2000.0) threshold = 2.0;
+				else threshold = 1.0;
+				if (rawVal < threshold) rawVal = 0.0;
 
-			// 配列の外を参照しないようガード
-			idx = Min(idx, amplitudes.size() - 1);
+				double h = Min(rawVal * m_spectrumScale * 200.0, region.h); //region.hは
 
-			double rawVal = amplitudes[idx];
-			if (rawVal < 0.5) rawVal = 0.0;
+				// 横軸の座標計算 (0〜maxHz を region.w にマッピング)
+				double xPos = region.x + (hz / maxHz) * region.w;
+				double yPos = region.y + region.h - h;
 
-			double h = Min(rawVal * 50, region.h);
+				points.emplace_back(xPos, yPos);
+			}
 
-			// 横軸の座標計算 (0〜maxHz を region.w にマッピング)
-			double xPos = region.x + (hz / maxHz) * region.w;
-			double yPos = region.y + region.h - h;
+			// 折れ線を描画
+			points.draw(2.0, Palette::Red);
 
-			points.emplace_back(xPos, yPos);
-		}
+			// 下に目盛り（数字）を表示
+			for (double hz = minHz; hz <= maxHz; hz += stepHz) {
+				double xPos = region.x + (hz / maxHz) * region.w;
 
-		// 折れ線を描画
-		points.draw(2.0, Palette::Red);
+				if ((int)hz % 200 == 0) {
+					// ガイドライン
+					Line{ xPos, region.y, xPos, region.y + region.h }.draw(1, ColorF{ 0, 0.1 });
+					// 数字
+					m_font(U"{}"_fmt(static_cast<int>(hz))).drawAt(10, xPos, region.y + region.h + 15, Palette::Black);
+				}
+			}
 
-		// 下に目盛り（数字）を表示
-		for (double hz = 0; hz <= maxHz; hz += stepHz) {
-			double xPos = region.x + (hz / maxHz) * region.w;
+			if (region.mouseOver())
+			{
+				double relativeX = (Cursor::Pos().x - region.x) / region.w;
+				double cursorHz = relativeX * maxHz;
 
-			// ガイドライン
-			Line{ xPos, region.y, xPos, region.y + region.h }.draw(1, ColorF{ 0, 0.1 });
-			// 数字
-			m_font(U"{}"_fmt(static_cast<int>(hz))).drawAt(10, xPos, region.y + region.h + 15, Palette::Black);
+				// インデックスに変換
+				size_t idx = static_cast<size_t>(cursorHz * AudioConfig::SAMPLE_COUNT / AudioConfig::m_samplingRate);
+				idx = Min(idx, amplitudes.size() - 1);
+
+				double preciseHz = idx * (AudioConfig::m_samplingRate / AudioConfig::SAMPLE_COUNT);
+
+				//垂直線を「ビンの中心」に引き直す（オプション。これで見栄えがよくなる)
+				double preciseX = region.x + (preciseHz / maxHz) * region.w;
+
+				//そのインデックスが持つ「正確な周波数」を逆算
+				Line{ preciseX, region.y, preciseX, region.y + region.h }.draw(1, Palette::Gray);
+
+				const String label = U"{:.1f} Hz"_fmt(preciseHz);
+				// 文字の表示領域を計算し、少し広げて白背景にする
+				const auto regionText = m_font(label).regionAt(18, Cursor::Pos().x, region.y - 20);
+				regionText.stretched(4, 2).draw(Palette::White);
+				m_font(label).drawAt(18, preciseX, region.y - 20, Palette::Black);
+			}
+			
 		}
 	}
 

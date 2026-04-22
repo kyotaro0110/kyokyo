@@ -24,7 +24,7 @@ public:
 
 		if (currentButton == 'z')
 		{
-			font(U"Controller is not connected").draw(getRightBottomPos(50, 10), Palette::Black);
+			font(U"Controller is not connected").draw(getRightBottomPos(50, 50), Palette::Black);
 			return;
 		}
 

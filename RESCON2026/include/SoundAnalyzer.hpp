@@ -32,7 +32,6 @@ public:
 		SoundReceiver::update();
 		for (int i = 0; i < AudioConfig::SAMPLE_COUNT; ++i)
 		{
-
 			double window = 0.54 - 0.46 * std::cos(2.0 * Math::Pi * i / (AudioConfig::SAMPLE_COUNT - 1));
 			m_fftReal[i] = static_cast<double>(m_buffer[i]) / 32767.0 * window; 
 			m_fftImag[i] = 0.0; //音声信号に虚部はないので0固定
@@ -58,11 +57,11 @@ public:
 
 		double peakHz = peakIndex * (AudioConfig::m_samplingRate / AudioConfig::SAMPLE_COUNT); //音の強さの最大値となるときのインデックスを使用して、周波数を特定
 
-		if (Scene::FrameCount() % 60 == 0) {
+		//if (Scene::FrameCount() % 60 == 0) {
 
-			if (maxAmp > 0.1)
-				Print << U"Peak: " << peakHz << U"Hz";
-		}
+		//	if (maxAmp > 0.1)
+		//		//Print << U"Peak: " << peakHz << U"Hz";
+		//}
 
 
 	}

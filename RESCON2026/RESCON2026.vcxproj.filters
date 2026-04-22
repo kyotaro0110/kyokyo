@@ -851,5 +851,11 @@
     <ClInclude Include="include\ヘッダー.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Pulldown.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AudioConfig.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
